@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Bewfords Link Line</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7104432829574575" crossorigin="anonymous"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(135deg, #ffb6c1, #ffc0cb, #ff69b4);
+            color: #ffffff;
+            position: relative;
+        }
+        .background-animation {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1;
+        }
+        .petal {
+            position: absolute;
+            width: 12px;
+            height: 16px;
+            background: pink;
+            border-radius: 50% 50% 50% 0;
+            opacity: 0.8;
+            animation: fall 6s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes fall {
+            0% {
+                transform: translateY(-100px) translateX(-10px) rotate(0deg);
+                opacity: 1;
+            }
+            25% {
+                transform: translateY(25vh) translateX(10px) rotate(90deg);
+            }
+            50% {
+                transform: translateY(50vh) translateX(-10px) rotate(180deg);
+                opacity: 0.8;
+            }
+            75% {
+                transform: translateY(75vh) translateX(10px) rotate(270deg);
+            }
+            100% {
+                transform: translateY(100vh) translateX(-10px) rotate(360deg);
+                opacity: 0;
+            }
+        }
+        .container {
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(5px);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .profile h1 {
+            font-size: 2.5rem;
+            margin: 1rem 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            letter-spacing: 1px;
+        }
+
+        .profile p {
+            font-size: 1.1rem;
+            margin-bottom: 1.5rem;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+            opacity: 0.9;
+        }
+
+        .links a {
+            display: block;
+            padding: 15px;
+            margin: 12px 0;
+            background: linear-gradient(90deg, rgba(255, 105, 180, 0.9), rgba(255, 20, 147, 0.9));
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            opacity: 0.9;
+            transform: translateY(0);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .links a:hover {
+            transform: translateY(-2px) scale(1.05);
+            opacity: 1;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+            filter: brightness(1.1);
+        }
+
+        .profile img {
+            width: 120px;
+            border-radius: 50%;
+            transition: all 0.4s ease;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .profile img:hover {
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.3);
+        }
+
+    </style>
+</head>
+<body>
+    <div class="background-animation"></div>
+    <div class="container">
+        <div class="profile">
+            <img src="profile.jpg" alt="Profile Picture">
+            <h1>Bewtopia</h1>
+            <p>@bewford, bewfordq, bewfordx3</p>
+        </div>
+        <div class="links">
+            <a href="https://namemc.com/profile/bewfordx3.1" target="_blank">NameMC</a>
+            <a href="https://laby.net/@bewfordx3" target="_blank">Labymod</a>
+            <a href="https://www.last.fm/user/bewfordq" target="_blank">Last.fm</a>
+            <a href="https://www.instagram.com/bewfordx3/" target="_blank">Instagram</a>
+            <a href="https://github.com/bewfordq" target="_blank">Github</a>
+            <a href="https://github.com/bewfordq/LnkTree" target="_blank">Source Code</a>
+        </div>
+    </div>
+    <script>
+        function createPetals() {
+            const bg = document.querySelector('.background-animation');
+            setInterval(() => {
+                let petal = document.createElement('div');
+                petal.classList.add('petal');
+                petal.style.left = Math.random() * 100 + 'vw';
+                petal.style.animationDuration = (3 + Math.random() * 3) + 's';
+                petal.style.opacity = 0.6 + Math.random() * 0.4;
+                bg.appendChild(petal);
+
+                setTimeout(() => petal.remove(), 6000);
+            }, 200);
+        }
+        createPetals();
+    </script>
+</body>
+</html>
