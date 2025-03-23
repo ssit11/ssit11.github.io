@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Bewfords Link Line</title>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7104432829574575" crossorigin="anonymous"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            background: black;
+            color: #ffffff;
+            position: relative;
+        }
+        .background-animation {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1;
+        }
+        .line {
+            position: absolute;
+            width: 2px;
+            height: 100px;
+            background: cyan;
+            opacity: 0.7;
+            transition: transform 0.3s ease, background 0.3s ease;
+            animation: moveLines 4s linear infinite;
+        }
+        .line:hover {
+            transform: scale(1.5);
+            background: magenta;
+            box-shadow: 0 0 10px magenta;
+        }
+        @keyframes moveLines {
+            0% { transform: translateY(-100px); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateY(100vh); opacity: 0; }
+        }
+        .container {
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            z-index: 1;
+        }
+        .profile img {
+            width: 100px;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+        .profile img:hover {
+            transform: scale(1.1);
+        }
+        .links {
+            margin-top: 20px;
+        }
+        .links a {
+            display: block;
+            padding: 15px;
+            margin: 10px 0;
+            background: linear-gradient(90deg, #ff0000, #ff9900, #ffff00, #33cc33, #0099ff, #6633cc, #ff0099);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: transform 0.3s ease, filter 0.3s ease;
+            background-size: 300% 300%;
+            animation: rainbowGlow 3s linear infinite alternate;
+        }
+        .links a:hover {
+            transform: scale(1.1);
+            filter: brightness(1.2);
+        }
+        @keyframes rainbowGlow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-animation"></div>
+    <div class="container">
+        <div class="profile">
+            <img src="profile.jpg" alt="Profile Picture">
+            <h1>fagtopia</h1>
+            <p>@bewford, bewfordq, bewfordx3</p>
+        </div>
+        <div class="links">
+            <a href="https://namemc.com/profile/bewfordx3.1" target="_blank">NameMC</a>
+            <a href="https://laby.net/@bewfordx3" target="_blank">Labymod</a>
+            <a href="https://www.last.fm/user/bewfordq" target="_blank">Last.fm</a>
+            <a href="https://www.instagram.com/bewfordx3/" target="_blank">Instagram</a>
+            <a href="https://github.com/bewfordq" target="_blank">Github</a>
+            <a href="https://github.com/bewfordq/LnkTree" target="_blank">Source Code</a>
+        </div>
+    </div>
+    <script>
+        function createLines() {
+            const bg = document.querySelector('.background-animation');
+            for (let i = 0; i < 20; i++) {
+                let line = document.createElement('div');
+                line.classList.add('line');
+                line.style.left = Math.random() * 100 + 'vw';
+                line.style.animationDuration = (2 + Math.random() * 3) + 's';
+                line.style.animationDelay = Math.random() * 2 + 's';
+                bg.appendChild(line);
+            }
+        }
+        createLines();
+    </script>
+</body>
+</html>
