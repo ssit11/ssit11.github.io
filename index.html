@@ -11,12 +11,12 @@
   .controls { display:grid; grid-template-columns:1fr auto auto; gap:8px; }
   input,button { font:inherit; border-radius:10px; border:0; padding:12px; }
   input { min-width:0; }
-  button { background:#2b7cff; color:white; font-weight:700; }
+  button { background:#2b7cff; color:white; font-weight:700; cursor:pointer; }
   button.secondary { background:#30343a; }
-  #stage { position:relative; width:100%; max-width:900px; margin:auto; background:#000; }
+  #stage { position:relative; width:100%; max-width:900px; margin:auto; background:#000; overflow:hidden; }
   video,canvas { width:100%; display:block; }
   #overlay { position:absolute; inset:0; pointer-events:none; }
-  .plate { position:absolute; border:3px solid #35d05a; box-sizing:border-box; border-radius:5px; }
+  .plate { position:absolute; border:3px solid #35d05a; box-sizing:border-box; border-radius:5px; transition: all 0.1s ease-out; }
   .plate.target { border-color:#ff3b30; box-shadow:0 0 0 2px rgba(255,59,48,.25); }
   .label { position:absolute; top:-25px; left:0; padding:2px 6px; font-size:12px; white-space:nowrap; border-radius:4px; background:#35d05a; color:#071207; }
   .target .label { background:#ff3b30; color:#fff; }
@@ -47,7 +47,6 @@
 
 <section id="logs"><h2>Detection log</h2><div id="logItems"></div></section>
 
-<script src="https://docs.opencv.org/4.x/opencv.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -55,7 +54,11 @@ const video = $('video'), work = $('work'), overlay = $('overlay');
 const plateInput = $('plateInput'), statusEl = $('status'), logItems = $('logItems');
 const watchListEl = $('watchList');
 
-let stream, running = false, busy = false, lastAlert = 0, latestLocation = null;
+let stream, running = false, processing = false, lastAlert = 0, latestLocation = null;
+let worker = null;
+let lastAnalysisTime = 0;
+const ANALYSIS_INTERVAL = 350; // Throttle OCR to ~3 FPS in background without slowing down video 60 FPS UI
+
 const normalise = s => (s || '').toUpperCase().replace(/[^A-Z0-9]/g,'');
 
 let watchPlates = JSON.parse(localStorage.getItem('plateWatchList') || '[]')
@@ -110,6 +113,22 @@ async function getLocation() {
   ));
 }
 
+// Initialize Tesseract Worker with Whitelist & Fast Engine mode
+async function initWorker() {
+  setStatus('Initializing fast OCR engine...');
+  worker = await Tesseract.createWorker('eng', 1, {
+    corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.0.0',
+    logger: () => {}
+  });
+  // Restrict parameters to alphanumeric uppercase for faster execution
+  await worker.setParameters({
+    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+    tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
+  });
+  setStatus('Engine ready. Tap Start camera.');
+}
+initWorker();
+
 $('start').onclick = async () => {
   if (!watchPlates.length) { alert('Add at least one plate to the watch list first.'); return; }
   if (!navigator.mediaDevices?.getUserMedia) { alert('This browser does not support camera access.'); return; }
@@ -117,16 +136,18 @@ $('start').onclick = async () => {
   try {
     latestLocation = await getLocation();
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width:{ideal:1280}, height:{ideal:720} },
-      audio:false
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
     });
     video.srcObject = stream;
     await video.play();
     running = true;
     $('start').textContent = 'Running';
     $('start').disabled = true;
-    setStatus('Scanning locally in your browser…');
-    scanLoop();
+    setStatus('Scanning smoothly at 60fps…');
+    
+    // Start non-blocking render loop
+    requestAnimationFrame(processLoop);
   } catch (e) {
     console.error(e);
     setStatus('Could not start camera/location: ' + e.message);
@@ -141,6 +162,7 @@ function saveLog(item) {
   localStorage.setItem('plateWatchLogs', JSON.stringify(logs.slice(0,100)));
   renderLogs();
 }
+
 function renderLogs() {
   const logs = JSON.parse(localStorage.getItem('plateWatchLogs') || '[]');
   logItems.innerHTML = logs.map(x => `
@@ -152,92 +174,106 @@ function renderLogs() {
 }
 renderLogs();
 
-async function ocrImage(canvas) {
-  const { data:{ text } } = await Tesseract.recognize(canvas, 'eng', {
-    logger: () => {}
-  });
-  const candidates = text.toUpperCase().match(/[A-Z0-9]{3,8}/g) || [];
-  return candidates.map(normalise);
-}
-
-function drawBox(x,y,w,h,text,isTarget) {
-  const sx = video.clientWidth / video.videoWidth;
-  const sy = video.clientHeight / video.videoHeight;
+function drawBox(x, y, w, h, text, isTarget, scale) {
+  const sx = (video.clientWidth / video.videoWidth) / scale;
+  const sy = (video.clientHeight / video.videoHeight) / scale;
+  
   const box = document.createElement('div');
   box.className = 'plate' + (isTarget ? ' target' : '');
-  Object.assign(box.style,{left:(x*sx)+'px',top:(y*sy)+'px',width:(w*sx)+'px',height:(h*sy)+'px'});
+  Object.assign(box.style, {
+    left: (x * sx) + 'px',
+    top: (y * sy) + 'px',
+    width: (w * sx) + 'px',
+    height: (h * sy) + 'px'
+  });
   const label = document.createElement('div');
-  label.className='label'; label.textContent=text || (isTarget ? 'WATCH PLATE' : 'PLATE');
-  box.appendChild(label); overlay.appendChild(box);
+  label.className = 'label'; 
+  label.textContent = text || (isTarget ? 'WATCH PLATE' : 'PLATE');
+  box.appendChild(label); 
+  overlay.appendChild(box);
 }
 
 function snapshot() {
   const c = document.createElement('canvas');
-  c.width = video.videoWidth; c.height = video.videoHeight;
-  c.getContext('2d').drawImage(video,0,0);
-  return c.toDataURL('image/jpeg',0.85);
+  c.width = video.videoWidth; 
+  c.height = video.videoHeight;
+  c.getContext('2d').drawImage(video, 0, 0);
+  return c.toDataURL('image/jpeg', 0.8);
 }
 
 async function alertTarget(plate) {
   const now = Date.now();
-  if (now - lastAlert < 10000) return; // avoid repeated alerts every frame
+  if (now - lastAlert < 10000) return;
   lastAlert = now;
   latestLocation = await getLocation() || latestLocation;
-  const item = {plate, time:new Date().toISOString(), location:latestLocation, photo:snapshot()};
+  const item = { plate, time: new Date().toISOString(), location: latestLocation, photo: snapshot() };
   saveLog(item);
 
-  if (navigator.vibrate) navigator.vibrate([150,80,150]);
-  alert(`WATCH PLATE DETECTED: ${plate}\n${new Date(item.time).toLocaleString()}`);
+  if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
   setStatus(`ALERT: ${plate} detected and logged.`);
 }
 
-async function scanOnce() {
-  if (busy || !running || video.readyState < 2) return;
-  busy = true;
+async function runOCR() {
+  if (processing || !worker || video.readyState < 2) return;
+  processing = true;
+
   try {
-    // Downscale for speed. This OCR-first implementation is intentionally simple;
-    // it finds plate-like text and draws boxes over OCR text regions.
-    const scale = Math.min(1, 960 / video.videoWidth);
+    // 1. Lower canvas resolution dedicated for OCR processing (480px width max)
+    const scale = Math.min(1, 480 / video.videoWidth);
     work.width = Math.round(video.videoWidth * scale);
     work.height = Math.round(video.videoHeight * scale);
-    const ctx = work.getContext('2d', {willReadFrequently:true});
-    ctx.drawImage(video,0,0,work.width,work.height);
+    
+    const ctx = work.getContext('2d', { willReadFrequently: true });
+    
+    // 2. Pre-process frame: Convert to grayscale & contrast boost for rapid OCR text extraction
+    ctx.drawImage(video, 0, 0, work.width, work.height);
+    const imgData = ctx.getImageData(0, 0, work.width, work.height);
+    const d = imgData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) > 120 ? 255 : 0;
+      d[i] = d[i + 1] = d[i + 2] = v;
+    }
+    ctx.putImageData(imgData, 0, 0);
 
-    const { data } = await Tesseract.recognize(work, 'eng', {
-      logger: () => {}
-    });
+    // 3. Recognize asynchronously without blocking UI thread
+    const { data } = await worker.recognize(work);
 
     overlay.innerHTML = '';
     let hits = new Set();
 
-    // Tesseract provides word boxes. Plate recognition quality depends heavily on
-    // distance, motion blur, glare, and plate design.
     for (const word of (data.words || [])) {
       const plate = normalise(word.text);
       if (plate.length < 3 || plate.length > 8) continue;
       const b = word.bbox;
       const isTarget = watchPlates.includes(plate);
-      drawBox(b.x0/scale,b.y0/scale,(b.x1-b.x0)/scale,(b.y1-b.y0)/scale,plate,isTarget);
+      
+      drawBox(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, plate, isTarget, scale);
+      
       if (isTarget) hits.add(plate);
     }
+
     if (hits.size) {
       for (const hit of hits) await alertTarget(hit);
-    } else {
-      setStatus('Scanning… watching ' + watchPlates.length + ' plate' + (watchPlates.length === 1 ? '' : 's'));
     }
   } catch (e) {
     console.warn(e);
-    setStatus('Scanner error: ' + e.message);
   } finally {
-    busy = false;
+    processing = false;
   }
 }
 
-async function scanLoop() {
-  while (running) {
-    await scanOnce();
-    await new Promise(r => setTimeout(r, 1200)); // OCR is CPU intensive
+// Native 60 FPS RequestAnimationFrame Loop
+function processLoop(timestamp) {
+  if (!running) return;
+
+  // Run heavy OCR pipeline at throttled intervals in background worker
+  if (timestamp - lastAnalysisTime > ANALYSIS_INTERVAL) {
+    lastAnalysisTime = timestamp;
+    runOCR();
   }
+
+  // Keep 60fps video rendering active continuously
+  requestAnimationFrame(processLoop);
 }
 </script>
 </body>
